@@ -41,17 +41,29 @@
     <nav>
       <ul class="sidebar-nav">
         <li><a href="https://www.danblundell.com/">Home</a> </li>
-        
+        <li><a href="/blog/"> Blog </a></li>
       </ul>
     </nav>
 
-    <p>&copy; 2018. All rights reserved. </p>
+    <p>&copy; 2019. All rights reserved. </p>
   </div>
 </aside>
 
     <div class="content container">
     <div class="posts">
 <article class="post">
+  <h1 class="post-title">
+    <a href="https://www.danblundell.com/2019/01/aws-application-load-balancers-and-wordpress/">AWS Application Load Balancers and WordPress</a>
+  </h1>
+  <time datetime="2019-01-02T00:00:00Z" class="post-date">Wed, Jan 2, 2019</time>
+  We had a problem recently where a WordPress site that used an AWS Application Load Balancer didn&rsquo;t load over HTTPS. We kept seeing alot of mixed-content:blocked errors when the site loaded and even though all the usual settings within WordPress were set to use HTTPS, things like JavaScript files and stylesheets were still being requested over http.
+Context We&rsquo;d set up our application load balancer to serve HTTPS (port 443) traffic to the client but have the connection between the load balancer and the web servers over HTTP (port 80).
+  
+  <div class="read-more-link">
+    <a href="/2019/01/aws-application-load-balancers-and-wordpress/">Read More…</a>
+  </div>
+  
+</article><article class="post">
   <h1 class="post-title">
     <a href="https://www.danblundell.com/2015/02/maslow-how-to-spin-up-the-gov.uk-needs-api/">Maslow - how to spin up the GOV.UK Needs API</a>
   </h1>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-us" lang="en-us">
+<head>
+  <link href="//gmpg.org/xfn/11" rel="profile">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="generator" content="Hugo 0.52" />
+
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>AWS Application Load Balancers and WordPress &middot; Dan Blundell</title>
+
+  
+  <link type="text/css" rel="stylesheet" href="https://www.danblundell.com/css/print.css" media="print">
+  <link type="text/css" rel="stylesheet" href="https://www.danblundell.com/css/poole.css">
+  <link type="text/css" rel="stylesheet" href="https://www.danblundell.com/css/syntax.css">
+  <link type="text/css" rel="stylesheet" href="https://www.danblundell.com/css/hyde.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Abril+Fatface|PT+Sans:400,400i,700">
+
+
+  
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/apple-touch-icon-144-precomposed.png">
+  <link rel="shortcut icon" href="/favicon.png">
+
+  
+  <link href="" rel="alternate" type="application/rss+xml" title="Dan Blundell" />
+
+  
+</head>
+
+  <body class="theme-base-dan ">
+  <aside class="sidebar">
+  <div class="container sidebar-sticky">
+    <div class="sidebar-about">
+      <a href="https://www.danblundell.com/"><h1>Dan Blundell</h1></a>
+      <p class="lead">
+         
+      </p>
+    </div>
+
+    <nav>
+      <ul class="sidebar-nav">
+        <li><a href="https://www.danblundell.com/">Home</a> </li>
+        <li><a href="/blog/"> Blog </a></li>
+      </ul>
+    </nav>
+
+    <p>&copy; 2019. All rights reserved. </p>
+  </div>
+</aside>
+
+    <div class="content container">
+    <div class="post">
+  <h1>AWS Application Load Balancers and WordPress</h1>
+  <time datetime=2019-01-02T00:00:00Z class="post-date">Wed, Jan 2, 2019</time>
+  
+
+<p>We had a problem recently where a WordPress site that used an AWS Application Load Balancer didn&rsquo;t load over HTTPS. We kept seeing alot of <code>mixed-content:blocked</code> errors when the site loaded and even though all the usual settings within WordPress were set to use HTTPS, things like JavaScript files and stylesheets were still being requested over http.</p>
+
+<h2 id="context">Context</h2>
+
+<p>We&rsquo;d set up our application load balancer to serve HTTPS (port 443) traffic to the client but have the connection between the load balancer and the web servers over HTTP (port 80). This means less management and configuration on the servers but it seems to cause a problem if the application you&rsquo;re serving uses things like port number to determine if the request is HTTPS or not.</p>
+
+<p>We found this out first hand using with WordPress behind an application load balancer, and it got a little confusing.</p>
+
+<p>The problem stems from the way the <a href="https://core.trac.wordpress.org/browser/trunk/src/wp-includes/load.php#L1060">is_SSL()</a> WordPress function works.</p>
+
+<p>The WordPress <code>is_SSL()</code> function checks two things;</p>
+
+<ol>
+<li>the HTTPS server variable, it&rsquo;s expecting the HTTPS variable to be either <code>1</code> or <code>on</code></li>
+<li>the port number, it&rsquo;s expecting it to be <code>443</code></li>
+</ol>
+
+<p>This makes complete sense as for HTTPS requests those are the expected values. That&rsquo;s not quite the case if you&rsquo;re behind a load balancer and only encrypting traffic between the load balancer and the client (like we were, eek).</p>
+
+<p>Instead, the traffic comes from a client to the load balancer over port 443 (HTTPS) but once it hits the load balancer, the load balancer sends the request to a server over port 80 (straight up HTTP). This means to the servers knowledge, the request is HTTP so it gets handled like and HTTP request.</p>
+
+<p>We needed WordPress to understand that the traffic was actually from an HTTPS request so that when it worked out what to send as a responses it generated https links not http links.</p>
+
+<h2 id="solutions">Solutions</h2>
+
+<p>Thankfully one of the headers available once a request has been forwarded from a load balancer to a server is <code>X-Forwarded-Proto</code>.</p>
+
+<p>In short, <code>X-Forwarded-Proto</code> is the protocol of the request that the load balancer recieved rather than the one the server is being sent. In our case, it&rsquo;s <code>https</code>. Bonus.</p>
+
+<p>This means we could use the <code>X-Forwarded-Proto</code> header to determine if the request from the client was HTTPS or not, even though the request from the load balancer to the server was over HTTP.</p>
+
+<p>So how do we use this I hear you cry, well a few options depending on where you prefer to handle your changes and what orchestration you have in place.</p>
+
+<h3 id="web-server-apache">Web server (Apache)</h3>
+
+<p>Add the following to your web server config, something like <code>vhost.conf</code> would do just nicely.</p>
+
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-aconf" data-lang="aconf"><span style="color:#ff79c6">&lt;VirtualHost</span> <span style="color:#f1fa8c">*:80</span><span style="color:#ff79c6">&gt;</span>
+<span style="display:block;width:100%;background-color:#3d3f4a"><span style="color:#8be9fd;font-style:italic">SetEnvIf</span> X-Forwarded-Proto <span style="color:#f1fa8c">&#34;https&#34;</span> HTTPS=on
+</span><span style="color:#ff79c6">&lt;/VirtualHost&gt;</span></code></pre></div>
+
+<p>This checks if the request that terminated on the load balancer was an HTTPS request and if so, sets the local <code>HTTPS</code> environment variable to <code>on</code> (true).</p>
+
+<h3 id="wordpress-directly-wp-config-php">WordPress directly (wp-config.php)</h3>
+
+<p>Alternatively you could add something inside your <code>wp-config.php</code> file which will do a similar job;</p>
+
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash"><span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span>isset<span style="color:#ff79c6">(</span><span style="color:#8be9fd;font-style:italic">$_SERVER</span><span style="color:#ff79c6">[</span><span style="color:#f1fa8c">&#39;HTTP_X_FORWARDED_PROTO&#39;</span><span style="color:#ff79c6">])</span> <span style="color:#ff79c6">&amp;&amp;</span> <span style="color:#8be9fd;font-style:italic">$_SERVER</span><span style="color:#ff79c6">[</span><span style="color:#f1fa8c">&#39;HTTP_X_FORWARDED_PROTO&#39;</span><span style="color:#ff79c6">]</span> <span style="color:#ff79c6">==</span> <span style="color:#f1fa8c">&#39;https&#39;</span><span style="color:#ff79c6">)</span>
+<span style="color:#ff79c6">{</span>
+  <span style="color:#8be9fd;font-style:italic">$_SERVER</span><span style="color:#ff79c6">[</span><span style="color:#f1fa8c">&#39;HTTPS&#39;</span><span style="color:#ff79c6">]</span> <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">&#39;on&#39;</span>;
+<span style="color:#ff79c6">}</span></code></pre></div>
+
+<p>This checks if the request that terminated on the load balancer was an HTTPS request and if so, sets the local <code>HTTPS</code> environment variable to <code>on</code> (true).</p>
+
+<h2 id="summary">Summary</h2>
+
+<p>Although ideally we&rsquo;d end-to-end encrypt, this does make some orchestration and scaling a little easier as we don&rsquo;t have to worry about enabling or managing SSL on the individual servers. In this case we can just let the load balancer handle that traffic and let the servers serve content.</p>
+
+</div>
+
+
+    </div>
+
+    
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-43692868-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+  </body>
+</html>
