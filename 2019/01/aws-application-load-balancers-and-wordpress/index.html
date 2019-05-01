@@ -3,7 +3,7 @@
 <head>
   <link href="//gmpg.org/xfn/11" rel="profile">
   <meta http-equiv="content-type" content="text/html; charset=utf-8">
-  <meta name="generator" content="Hugo 0.52" />
+  <meta name="generator" content="Hugo 0.55.3" />
 
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -55,7 +55,7 @@
   <time datetime=2019-01-02T00:00:00Z class="post-date">Wed, Jan 2, 2019</time>
   
 
-<p>We had a problem recently where a WordPress site that used an AWS Application Load Balancer didn&rsquo;t load over HTTPS. We kept seeing alot of <code>mixed-content:blocked</code> errors when the site loaded and even though all the usual settings within WordPress were set to use HTTPS, things like JavaScript files and stylesheets were still being requested over http.</p>
+<p>You had a problem recently where a WordPress site that used an AWS Application Load Balancer didn&rsquo;t load over HTTPS. We kept seeing alot of <code>mixed-content:blocked</code> errors when the site loaded and even though all the usual settings within WordPress were set to use HTTPS, things like JavaScript files and stylesheets were still being requested over http.</p>
 
 <h2 id="context">Context</h2>
 
@@ -111,7 +111,7 @@
 
 <h2 id="summary">Summary</h2>
 
-<p>Although ideally we&rsquo;d end-to-end encrypt, this does make some orchestration and scaling a little easier as we don&rsquo;t have to worry about enabling or managing SSL on the individual servers. In this case we can just let the load balancer handle that traffic and let the servers serve content. It got us out of a hole anyway!</p>
+<p>Although ideally we&rsquo;d end-to-end encrypt, this does make some orchestration and scaling a little easier as we don&rsquo;t have to worry about enabling or managing SSL on the individual servers. In this case we can just let the load balancer handle that traffic and let the servers serve content.</p>
 
 </div>
 
